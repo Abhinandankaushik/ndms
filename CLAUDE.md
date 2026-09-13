@@ -41,15 +41,16 @@ behind each decision.
 | Frontend | Next.js 14 App Router + TypeScript | Four portals as route groups in one codebase |
 | Styling | Tailwind + shadcn/ui | Speed. Do not hand-write CSS |
 | Maps | **Leaflet** + react-leaflet + leaflet.markercluster | Not Mapbox — no API key means nothing can expire mid-demo |
-| Backend | NestJS (Node 20) + TypeScript | Module/guard structure mirrors the DFD processes |
+| Backend | NestJS 12 on **Node 24 LTS** + TypeScript **6.0** | Module/guard structure mirrors the DFD processes. Node 20 hit EOL 2026-04-30. TS stays on 6.0: ts-jest and typescript-eslint do not support TS 7 yet |
 | Database | PostgreSQL 16 + **PostGIS 3.4** | Nearly every query here is spatial |
-| ORM | Prisma **+ raw SQL for all geometry** | Prisma cannot express PostGIS types. Use `$queryRaw`. Do not fight this |
+| ORM | Prisma **7.x** (`@prisma/adapter-pg`, CJS client) **+ raw SQL for all geometry** | Prisma cannot express PostGIS types. Use `$queryRaw`. Do not fight this. npm `latest` points at an 8.0 RC — stay on 7.x |
+| Migrations | **dbmate**, plain forward-only SQL | Prisma Migrate treats PostGIS types and GiST indexes as drift. `schema.prisma` is introspected with `db pull`, never migrated |
 | Realtime | Socket.IO + `@socket.io/redis-adapter` | Rooms give per-district / per-team broadcast free |
 | Queue | BullMQ on Redis | Retries + inspectable dashboard |
 | Cache/live state | Redis 7 | Live team positions live here, NOT in Postgres |
-| Object storage | MinIO (S3-compatible) | Swaps to S3 via one env var |
+| Object storage | MinIO via the **`pgsty/minio`** community fork (S3-compatible) | Upstream stopped publishing images in Oct 2025. Code uses the S3 SDK, so it swaps to S3 (or Garage/SeaweedFS) via env vars |
 | Containers | **Docker Compose only** | Kubernetes is explicitly out of scope |
-| Tests | Jest + Supertest + **Testcontainers**, Playwright, k6 | Integration tests run against real PostGIS |
+| Tests | Jest + Supertest + **Testcontainers**, Playwright, k6 | Integration tests run against real PostGIS. Jest runs with `--experimental-vm-modules`, which it needs to `require()` the ESM-only Nest 12 packages |
 
 ---
 
@@ -117,14 +118,18 @@ ndms/
 │   │   ├── app/(rescue)/      mobile-first mission view
 │   │   └── app/(facility)/    shelter + hospital portal
 │   ├── api/                   NestJS
-│   │   └── src/modules/{auth,incidents,missions,facilities,volunteers,alerts,realtime,queue}
+│   │   ├── src/modules/{health,auth,incidents,missions,facilities,volunteers,alerts,realtime,queue}
+│   │   ├── src/infra/{database,redis,storage}   Prisma, ioredis, S3 clients
+│   │   ├── src/common/http/   response envelope + exception filter
+│   │   └── test/              *.int-spec.ts / *.e2e-spec.ts (Testcontainers)
 │   └── worker/                BullMQ consumers
 ├── packages/
 │   ├── shared-types/          generated from the OpenAPI contract
 │   └── config/                eslint / tsconfig / tailwind presets
 ├── infra/
 │   ├── docker-compose.yml
-│   └── migrations/
+│   ├── migrations/            dbmate, forward-only
+│   └── verify/                manual EXPLAIN ANALYZE checks
 ├── data/
 │   ├── seed/                  district GeoJSON, villages, facilities
 │   └── SOURCES.md             licence + attribution for every dataset
@@ -245,13 +250,26 @@ within 150 m and 12 minutes) for demo purposes.
 
 ## 11. Current status
 
-Nothing built yet. Week 1 has not started.
+**Week 1 done (2026-09-13).** `docker compose up` from the repo root gives a healthy
+stack (PostGIS, Redis, MinIO, Mosquitto, dbmate migrate, bucket init, API).
+`GET /api/v1/health` reports each dependency. Only a database failure returns 503;
+Redis or storage down gives 200 `degraded`. `pnpm db:verify-indexes` and
+`test/schema.int-spec.ts` show GiST index scans for ST_DWithin, bbox and KNN at 50k rows.
+
+**Schema v1 decisions that differ from the plan's §5.1 DDL:**
+- 5 roles, not 8.
+- One `facilities` table (`kind` SHELTER/HOSPITAL) instead of `shelters` + `hospitals`.
+- `incidents.location` is nullable, so a location-less SOS still lands (A1.2).
+- DB-level CHECKs enforce the reported_at clamp (clamp in SQL with `now()`) and require a human actor for rejections.
+- No Major-phase tables: pgvector, TimescaleDB, road graph, sensors, simulations.
+- Auth tables (refresh tokens) are deferred to the Week 2 migration.
+
+**Known quirks:**
+- Nest 12.0.1 needs `setGlobalPrefix('/api/v1')` with the leading slash, or 404s bypass the envelope.
+- The prod API image is 442 MB because `@prisma/client`'s optional `prisma` peer drags the CLI in. Trim it during Week 12 deploy hardening.
+- Next.js 14 is two majors behind (16.x). Decide before Week 4: react-leaflet 5 needs React 19, so Next 14 means react-leaflet 4.
 
 **Blocked on:** choosing the demonstration district. This decides every dataset
 download. Ask me for it before starting `tools/seed.ts` or any data script.
 
-**Next task:** Week 1 — repo scaffold, `docker-compose.yml` with
-PostGIS + Redis + MinIO + Mosquitto, schema v1 with spatial indexes, and a
-health-check endpoint. Then verify: `SELECT postgis_version();` returns a
-version, and `EXPLAIN ANALYZE` on a `ST_DWithin` query shows an index scan
-rather than a sequential scan.
+**Next task:** Week 2 — auth: OTP, JWT, refresh rotation, `@Roles()` guard.
