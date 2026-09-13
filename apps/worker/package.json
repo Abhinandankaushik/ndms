@@ -1,0 +1,27 @@
+{
+  "name": "@ndms/worker",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --runInBand"
+  },
+  "dependencies": {
+    "bullmq": "^6.3.4",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.1.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.13.4",
+    "@types/pg": "^8.23.1",
+    "jest": "^30.5.1",
+    "testcontainers": "^12.1.0",
+    "ts-jest": "^29.4.12",
+    "typescript": "~6.0.3"
+  }
+}
