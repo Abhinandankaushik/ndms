@@ -50,6 +50,7 @@ behind each decision.
 | Cache/live state | Redis 7 | Live team positions live here, NOT in Postgres |
 | Object storage | MinIO via the **`pgsty/minio`** community fork (S3-compatible) | Upstream stopped publishing images in Oct 2025. Code uses the S3 SDK, so it swaps to S3 (or Garage/SeaweedFS) via env vars |
 | Containers | **Docker Compose only** | Kubernetes is explicitly out of scope |
+| Data prep | **GDAL 3.13** Docker image (`gdal` compose service, `tools` profile) | ogr2ogr/gdalwarp without a local Python/GDAL install on Windows. Scripts live in `tools/data/*.sh` |
 | Tests | Jest + Supertest + **Testcontainers**, Playwright, k6 | Integration tests run against real PostGIS. Jest runs with `--experimental-vm-modules`, which it needs to `require()` the ESM-only Nest 12 packages |
 
 ---
@@ -275,8 +276,11 @@ Redis or storage down gives 200 `degraded`. `pnpm db:verify-indexes` and
 - The prod API image is 442 MB because `@prisma/client`'s optional `prisma` peer drags the CLI in. Trim it during Week 12 deploy hardening.
 - Next.js 14 is two majors behind (16.x). Decide before Week 4: react-leaflet 5 needs React 19, so Next 14 means react-leaflet 4.
 
-**District:** Darbhanga, Bihar (see §9). Data acquisition has not started. The postgis
-image has no `shp2pgsql`, so the boundary shapefile needs a new tool first; that choice
-is pending.
+**District:** Darbhanga, Bihar (see §9). Data acquisition has started; `data/SOURCES.md`
+is the record.
+- Boundary: extracted to `data/seed/darbhanga/district.geojson` (2,286.3 km² vs Census 2,279 km²).
+- OSM (Geofabrik eastern zone): downloaded and MD5-verified. Villages and facilities are not extracted yet.
+- WorldPop 2020 (100 m): still downloading. The server ignores HTTP Range requests, so the download can't resume and a window read isn't possible, and it runs at ~35 KB/s.
+- Boundary cross-check: the DataMeet polygon is canonical (+0.3 % vs Census). OSM's Darbhanga relation is +10.5 % and extends further south. Clip OSM features to the DataMeet polygon.
 
 **Next task:** Week 2 — auth: OTP, JWT, refresh rotation, `@Roles()` guard.

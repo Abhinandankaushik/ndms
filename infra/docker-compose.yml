@@ -127,6 +127,14 @@ services:
       retries: 10
       start_period: 20s
 
+  gdal:
+    image: ghcr.io/osgeo/gdal:ubuntu-small-3.13.3
+    profiles: ["tools"]
+    working_dir: /work
+    volumes:
+      - ../data:/work/data
+      - ../tools/data:/work/tools/data:ro
+
 volumes:
   postgres-data:
   redis-data:

@@ -50,6 +50,17 @@ pnpm db:psql
 Geography columns appear in Prisma as `Unsupported("geography")`: read and write them with
 `$queryRaw` inside `*.repository.ts` files.
 
+## Data
+
+The demo district is Darbhanga, Bihar. Every dataset, with its licence, attribution and
+checksum, is recorded in [`data/SOURCES.md`](data/SOURCES.md). Raw downloads go in
+`data/raw/` (gitignored). Preparation scripts run in the GDAL tools container:
+
+```bash
+pnpm data:boundary                                         # data/seed/darbhanga/district.geojson
+docker compose run --rm gdal sh tools/data/compare-osm-boundary.sh
+```
+
 ## Tests
 
 ```bash
