@@ -1,6 +1,7 @@
 import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { randomUUID } from 'node:crypto';
 import { Client, type DatabaseError } from 'pg';
+import { DB_ENUMS } from '../src/common/domain/enums';
 import { startPostgis } from './support/containers';
 import { applyMigrations } from './support/migrations';
 
@@ -64,6 +65,12 @@ describe('schema v1 on real PostGIS', () => {
   afterAll(async () => {
     await db?.end();
     await container?.stop();
+  });
+
+  it.each(Object.entries(DB_ENUMS))('keeps the %s enum in sync with src/common/domain/enums.ts', async (name, values) => {
+    const result = await db.query<{ values: string[] }>(`SELECT enum_range(NULL::${name})::text[] AS values`);
+
+    expect(result.rows[0]!.values).toEqual([...values]);
   });
 
   it('gives every spatial column a GiST index led by that column', async () => {

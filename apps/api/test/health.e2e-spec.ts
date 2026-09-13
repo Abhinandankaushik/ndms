@@ -26,6 +26,7 @@ describe('GET /api/v1/health', () => {
       S3_ACCESS_KEY_ID: MINIO_CREDENTIALS.user,
       S3_SECRET_ACCESS_KEY: MINIO_CREDENTIALS.password,
       S3_BUCKET: 'ndms-test',
+      JWT_ACCESS_SECRET: 'test-secret-that-is-at-least-32-characters-long',
     });
     await createBucket(env.S3_ENDPOINT, env.S3_BUCKET);
 
