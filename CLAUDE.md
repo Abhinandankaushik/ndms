@@ -230,7 +230,13 @@ weight incident placement by population and inverse distance to rivers, not
 uniform random. Include one deliberate duplicate cluster (8 reports of one event
 within 150 m and 12 minutes) for demo purposes.
 
-**District is not yet chosen.** Ask me before writing any download script.
+**Demo district: Darbhanga, Bihar** (chosen 2026-09-13). It combines a documented flood
+history with usable OpenStreetMap coverage. Barpeta (Assam) was considered and rejected:
+on 2026-09-13, OSM had 9 villages and 18 school/hospital features there, against 105 and
+87 in Darbhanga. Bihar's OSM data is in Geofabrik's `asia/india/eastern-zone` extract.
+
+The DataMeet district boundaries are **CC BY 2.5 India** (per `Districts/README.md`), not
+MIT as the implementation plan says. Attribute them.
 
 ---
 
@@ -269,7 +275,8 @@ Redis or storage down gives 200 `degraded`. `pnpm db:verify-indexes` and
 - The prod API image is 442 MB because `@prisma/client`'s optional `prisma` peer drags the CLI in. Trim it during Week 12 deploy hardening.
 - Next.js 14 is two majors behind (16.x). Decide before Week 4: react-leaflet 5 needs React 19, so Next 14 means react-leaflet 4.
 
-**Blocked on:** choosing the demonstration district. This decides every dataset
-download. Ask me for it before starting `tools/seed.ts` or any data script.
+**District:** Darbhanga, Bihar (see §9). Data acquisition has not started. The postgis
+image has no `shp2pgsql`, so the boundary shapefile needs a new tool first; that choice
+is pending.
 
 **Next task:** Week 2 — auth: OTP, JWT, refresh rotation, `@Roles()` guard.
