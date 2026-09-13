@@ -1,0 +1,45 @@
+{
+  "name": "@ndms/api",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "db:pull": "prisma db pull",
+    "build": "prisma generate && nest build",
+    "start:dev": "prisma generate && nest start --watch --exec \"node --env-file-if-exists=../../.env\"",
+    "start:prod": "node dist/main.js",
+    "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --config jest.config.json",
+    "test:int": "prisma generate && node --experimental-vm-modules --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --config test/jest-int.config.json --runInBand"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1131.0",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/platform-express": "^12.0.1",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "ioredis": "^6.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.6.4"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.0",
+    "@nestjs/testing": "^12.0.1",
+    "@testcontainers/postgresql": "^12.1.0",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.13.4",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
+    "jest": "^30.5.1",
+    "pg": "^8.23.0",
+    "prisma": "^7.10.0",
+    "supertest": "^7.2.2",
+    "testcontainers": "^12.1.0",
+    "ts-jest": "^29.4.12",
+    "typescript": "~6.0.3"
+  }
+}
