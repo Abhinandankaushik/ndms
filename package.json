@@ -1,0 +1,20 @@
+{
+  "name": "ndms",
+  "private": true,
+  "packageManager": "pnpm@10.18.0",
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
+  "scripts": {
+    "stack:up": "docker compose up -d --build --wait",
+    "stack:down": "docker compose down",
+    "infra:up": "docker compose up -d --wait postgres redis minio mosquitto migrate minio-init",
+    "db:migrate": "docker compose run --rm migrate",
+    "db:psql": "docker compose exec postgres psql",
+    "db:verify-indexes": "docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -f - < infra/verify/spatial-index.sql",
+    "api:dev": "pnpm --filter @ndms/api start:dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:int": "pnpm -r test:int"
+  }
+}

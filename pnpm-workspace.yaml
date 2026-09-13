@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+ignoredBuiltDependencies:
+  - '@parcel/watcher'
+  - '@prisma/engines'
+  - cpu-features
+  - prisma
+  - protobufjs
+  - ssh2
+  - unrs-resolver
