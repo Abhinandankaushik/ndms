@@ -71,4 +71,6 @@ console.log(
 );
 
 sockets.forEach((socket) => socket.disconnect());
-process.exit(delivered / expected >= 0.99 ? 0 : 1);
+// exitCode rather than exit(): a hard exit while socket.io is still tearing its handles
+// down trips a libuv assertion on Windows.
+process.exitCode = delivered / expected >= 0.99 ? 0 : 1;

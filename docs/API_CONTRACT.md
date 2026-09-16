@@ -112,12 +112,21 @@ The SOS enqueues BullMQ job `enrich` on queue `incident-enrichment` with
 |---|---|---|---|
 | `GET /teams` | GOVT_OFFICIAL | — | `Team[]` = `{ id, name, agency, teamSize, capabilities, isAvailable, lat, lon, locationUpdatedAt, activeMissionId }`, with live Redis positions overlaid |
 | `GET /teams/nearest?incidentId=&capability=&limit=5` | GOVT_OFFICIAL | — | `(Team & { distanceM })[]`: available teams by KNN (`current_location <-> point`), within the district. O4 target < 100 ms |
-| `POST /missions` | GOVT_OFFICIAL | `{ incidentId, teamId, etaMinutes? }` | `Mission`; 409 `MISSION_ALREADY_OPEN`, 409 `TEAM_UNAVAILABLE`; moves the incident to ASSIGNED |
+| `POST /missions` | GOVT_OFFICIAL | `{ incidentId, teamId, etaMinutes? }` | `Mission`; 404 `TEAM_NOT_FOUND`, 409 `INCIDENT_NOT_OPEN`, 409 `MISSION_ALREADY_OPEN`, 409 `TEAM_UNAVAILABLE`; moves the incident to ASSIGNED |
 | `GET /missions?status=&incidentId=` | GOVT_OFFICIAL | — | `Mission[]` |
-| `GET /missions/mine` | RESCUE_TEAM | — | `MissionWithIncident[]`: open first, by incident priority |
-| `GET /missions/:id` | in-district official, the assigned team | — | `MissionWithIncident`, including the reporter's name and phone for the team, and an `AuditService.record` row `mission.reporter_contact.viewed` |
-| `PATCH /missions/:id/status` | team (forward steps), official (CANCELLED) | `{ status, rejectionReason?, peopleRescued?, injuredCount?, hospitalRequired?, outcomeNotes? }` | `Mission` |
-| `POST /teams/me/location` | RESCUE_TEAM | `{ lat, lon, accuracyM?, recordedAt }` | 202 `{ accepted: boolean }`; writes to Redis only |
+| `GET /missions/mine` | RESCUE_TEAM | — | `MissionWithIncident[]` = `Mission & { incident }`: open first, by incident priority |
+| `GET /missions/:id` | in-district official, the assigned team | — | `MissionWithIncident & { reporter }`, and an `AuditService.record` row `mission.reporter_contact.viewed` |
+| `PATCH /missions/:id/status` | team (forward steps), official (CANCELLED) | `{ status, rejectionReason?, peopleRescued?, injuredCount?, hospitalRequired?, outcomeNotes? }` | `Mission`; 404 `MISSION_NOT_FOUND`, 409 `INVALID_MISSION_TRANSITION`, 409 `TEAM_UNAVAILABLE` |
+| `POST /teams/me/location` | RESCUE_TEAM | `{ lat, lon, accuracyM?, recordedAt }` | 202 `{ accepted: boolean }`; writes to Redis only. 404 `TEAM_NOT_FOUND`, 503 `LIVE_LOCATION_UNAVAILABLE` when Redis is down |
+
+`reporter` (name and phone) is returned **only** to the assigned team, and only while the
+mission is open; an official reading the same mission gets `null`, because the contact
+details are there to reach the caller from the field, not to browse.
+
+Sending the status a mission is already at is answered as a no-op replay with the
+unchanged mission, not a 409: a rescue team on a bad connection retries, and a retry must
+not look like a failure. `TEAM_UNAVAILABLE` on `ACCEPTED` means another dispatch occupied
+the team between the assignment and the acceptance.
 
 Mission steps are `ASSIGNED → ACCEPTED | REJECTED` (a rejection needs a reason),
 `ACCEPTED → EN_ROUTE → ON_SITE → COMPLETED` (completion needs `peopleRescued`), and any

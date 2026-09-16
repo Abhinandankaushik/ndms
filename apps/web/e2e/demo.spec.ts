@@ -34,8 +34,10 @@ test('citizen portal', async ({ page }) => {
   for (const [path, name] of [
     ['/citizen/shelters', '02-citizen-shelters'],
     ['/citizen/alerts', '03-citizen-alerts'],
-    ['/citizen/contacts', '04-citizen-contacts'],
+    ['/citizen/incidents', '04-citizen-incidents'],
     ['/citizen/report', '05-citizen-report'],
+    ['/citizen/contacts', '05b-citizen-helplines'],
+    ['/citizen/volunteer', '05c-citizen-volunteer'],
   ] as const) {
     await page.goto(path);
     await shoot(page, name);
@@ -67,6 +69,8 @@ test('rescue and facility portals', async ({ browser }) => {
   const facility = await browser.newPage();
   await signIn(facility, PHONES.facility, /\/facility/);
   await shoot(facility, '13-facility-occupancy');
+  await facility.goto('/facility/inventory');
+  await shoot(facility, '13b-facility-inventory');
   await facility.close();
 });
 

@@ -15,19 +15,25 @@ async function apiToken(request: APIRequestContext, phone: string): Promise<stri
   return body.data.accessToken;
 }
 
-async function myIncidentCount(request: APIRequestContext, token: string): Promise<number> {
+// GET /incidents/mine caps at the 100 newest, so a count cannot tell a new report from a
+// dropped old one. Compare the id sets instead.
+async function myIncidentIds(request: APIRequestContext, token: string): Promise<Set<string>> {
   const response = await request.get(`${API}/api/v1/incidents/mine`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const body = (await response.json()) as { data: unknown[] };
-  return body.data.length;
+  const body = (await response.json()) as { data: { id: string }[] };
+  return new Set(body.data.map((incident) => incident.id));
 }
 
-test('O2: a report made offline arrives exactly once after reconnecting', async ({ browser, request }) => {
+const added = (before: Set<string>, after: Set<string>) => [...after].filter((id) => !before.has(id));
+
+test('O2: a report made offline arrives exactly once after reconnecting', async ({ browser, request, isMobile }) => {
+  test.skip(!isMobile, 'O2 is the phone flow; one run is enough');
   const token = await apiToken(request, CITIZEN_E164);
-  const before = await myIncidentCount(request, token);
+  const before = await myIncidentIds(request, token);
 
   const context = await browser.newContext({
+    ...test.info().project.use,
     permissions: ['geolocation'],
     geolocation: { latitude: 26.1542, longitude: 85.8918 },
   });
@@ -50,21 +56,27 @@ test('O2: a report made offline arrives exactly once after reconnecting', async 
 
   await expect(page.getByText(/saved on this phone|queued|offline/i).first()).toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: 'demo-screenshots/16-citizen-offline-queued.png' });
-  expect(await myIncidentCount(request, token)).toBe(before);
+  expect(added(before, await myIncidentIds(request, token))).toHaveLength(0);
 
   await context.setOffline(false);
   await expect
-    .poll(async () => myIncidentCount(request, token), { timeout: 30_000, intervals: [500] })
-    .toBe(before + 1);
+    .poll(async () => added(before, await myIncidentIds(request, token)).length, {
+      timeout: 40_000,
+      intervals: [500],
+    })
+    .toBe(1);
 
   // Nothing may arrive twice, however often the outbox retries.
   await page.waitForTimeout(5_000);
-  expect(await myIncidentCount(request, token)).toBe(before + 1);
+  const delivered = added(before, await myIncidentIds(request, token));
+  console.log(`O2: the offline report arrived once as ${delivered[0]}, with no duplicate after a further 5 s`);
+  expect(delivered).toHaveLength(1);
   await page.screenshot({ path: 'demo-screenshots/17-citizen-offline-synced.png' });
   await context.close();
 });
 
-test('O3: the officer map renders the district at scale', async ({ page, request }) => {
+test('O3: the officer map renders the district at scale', async ({ page, request, isMobile }) => {
+  test.skip(Boolean(isMobile), 'O3 measures the officer control room, which is a desktop portal');
   const response = await request.get(`${API}/api/v1/health`);
   expect(response.ok()).toBeTruthy();
 

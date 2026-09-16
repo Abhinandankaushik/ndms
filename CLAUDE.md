@@ -272,13 +272,19 @@ Redis or storage down gives 200 `degraded`. `pnpm db:verify-indexes` and
 - No Major-phase tables: pgvector, TimescaleDB, road graph, sensors, simulations.
 - Refresh tokens come in migration 2 (`20260913150000_auth_refresh_tokens.sql`).
 
-**API foundation done (2026-09-13).** Everything below has e2e tests against real containers:
+**Minor project feature-complete (2026-09-17).** All 34 features are built, integrated and
+running together. Every module below has e2e tests against real containers (232 passing):
 - Auth: OTP via `OTP_DEV_CODE`, 15-min JWT, rotating refresh cookie with reuse detection, `@Public` / `@Roles` / `@CurrentUser`.
 - Incidents: SOS fast path, idempotent upsert, SQL clamp, bbox map, priority queue, status workflow, review queue.
 - Media: presigned upload and confirm.
 - Realtime: Socket.IO gateway with JWT handshake and role/district rooms. `DomainEventBus` fans events out; the Redis channel `ndms:events` relays worker events.
-- `AuditService`.
-- The remaining Minor modules are built in parallel against `docs/API_CONTRACT.md`.
+- Missions and teams, facilities, volunteers, alerts, dashboard KPIs, sync, audit.
+- Worker: `incident-enrichment` (duplicate detection, priority scoring, review flags).
+- Web: four portals on Next.js 16, Leaflet maps with clustering, Serwist service worker and an IndexedDB outbox for offline reports.
+- Seed: deterministic Darbhanga dataset, 15 demo accounts (three per role) from `+919000000001`.
+
+**Success criteria: all seven measured and passing** — `docs/MEASUREMENTS.md`. The demo
+walkthrough is `docs/DEMO.md`.
 
 **Known quirks:**
 - Nest 12.0.1 needs `setGlobalPrefix('/api/v1')` with the leading slash, or 404s bypass the envelope.
@@ -287,11 +293,18 @@ Redis or storage down gives 200 `degraded`. `pnpm db:verify-indexes` and
 - The global response envelope and exception filter only shape HTTP; socket acks keep their own shape.
 - Jest needs `node --experimental-vm-modules` to `require()` the ESM-only Nest 12 packages.
 
-**District:** Darbhanga, Bihar (see §9). Data acquisition has started; `data/SOURCES.md`
+- Tailwind's `sr-only` is `position: absolute`. Inside a scrolling list whose container is
+  `position: static`, those spans escape the clip and stretch the document — the officer
+  dashboard grew to 4,795 px against a 760 px viewport. Scroll containers need `relative`.
+- `GET /incidents/mine` caps at the 100 newest, so counting it cannot prove a sync arrived.
+
+**District:** Darbhanga, Bihar (see §9). Data acquisition is complete; `data/SOURCES.md`
 is the record.
 - Boundary: extracted to `data/seed/darbhanga/district.geojson` (2,286.3 km² vs Census 2,279 km²).
-- OSM (Geofabrik eastern zone): downloaded and MD5-verified. Villages and facilities are not extracted yet.
-- WorldPop 2020 (100 m): still downloading. The server ignores HTTP Range requests, so the download can't resume and a window read isn't possible, and it runs at ~35 KB/s.
-- Boundary cross-check: the DataMeet polygon is canonical (+0.3 % vs Census). OSM's Darbhanga relation is +10.5 % and extends further south. Clip OSM features to the DataMeet polygon.
+- OSM (Geofabrik eastern zone): downloaded, MD5-verified, settlements and facilities extracted and clipped to the DataMeet polygon.
+- WorldPop 2020 (100 m): the server ignores HTTP Range requests, so the download could not resume; Darbhanga was clipped out of the partial file (~4.40 M people vs Census 3.94 M).
+- Boundary cross-check: the DataMeet polygon is canonical (+0.3 % vs Census). OSM's Darbhanga relation is +10.5 % and extends further south. OSM features are clipped to the DataMeet polygon.
 
-**Next task:** integrate the parallel module work (missions, facilities, volunteers, alerts, dashboard, platform, worker, web portals, seed): register modules in `app.module.ts`, add the worker to Compose, then run every suite.
+**Remaining before submission:** the report itself (Prof. Deepak Kumar Sahu's college
+format, roll numbers still blank), and the Week 12 deploy hardening noted above (the
+442 MB API image).
