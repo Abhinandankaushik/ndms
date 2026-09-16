@@ -18,7 +18,7 @@ import { createTestApp, startStack, stopStack, type TestApp, type TestStack } fr
 
 const DARBHANGA_TOWN = { lat: 26.1542, lon: 85.8918 };
 const REPORTS_PER_HOUR = 10;
-const OTP_VERIFICATIONS_PER_WINDOW = 10;
+const OTP_VERIFICATIONS_PER_WINDOW = 30;
 
 interface SyncResult {
   clientUuid: string | null;

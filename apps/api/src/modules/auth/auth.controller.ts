@@ -51,7 +51,9 @@ export class AuthController {
   }
 
   @Public()
-  @RateLimit({ bucket: 'otp-verify', limit: 10, windowSeconds: 15 * 60 })
+  // Per IP, because a demo or a relief camp shares one connection; brute force is stopped
+  // per phone instead, by the five-attempt lock in OtpStore.
+  @RateLimit({ bucket: 'otp-verify', limit: 30, windowSeconds: 15 * 60 })
   @Post('otp/verify')
   @HttpCode(200)
   async verifyOtp(
