@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Inject, Patch, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { RateLimit } from '../../common/rate-limit/rate-limit.decorator';
 import { zodBody } from '../../common/validation/zod-validation.pipe';
 import { ENV, type Env } from '../../config/env';
 import type { UserRecord } from '../users/users.repository';
@@ -50,6 +51,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit({ bucket: 'otp-verify', limit: 10, windowSeconds: 15 * 60 })
   @Post('otp/verify')
   @HttpCode(200)
   async verifyOtp(

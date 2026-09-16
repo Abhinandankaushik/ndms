@@ -132,6 +132,21 @@ services:
       retries: 10
       start_period: 20s
 
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: *database-url
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
   gdal:
     image: ghcr.io/osgeo/gdal:ubuntu-small-3.13.3
     profiles: ["tools"]

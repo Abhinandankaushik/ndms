@@ -3,12 +3,18 @@ import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainer
 
 export const MINIO_CREDENTIALS = { user: 'ndms-test', password: 'ndms-test-password' } as const;
 
+// Data directories live in tmpfs: these images declare VOLUMEs, and every test run would
+// otherwise leave an anonymous volume on disk.
+
 export function startPostgis(): Promise<StartedPostgreSqlContainer> {
-  return new PostgreSqlContainer('postgis/postgis:16-3.4').start();
+  return new PostgreSqlContainer('postgis/postgis:16-3.4')
+    .withTmpFs({ '/var/lib/postgresql/data': 'rw' })
+    .start();
 }
 
 export function startRedis(): Promise<StartedTestContainer> {
   return new GenericContainer('redis:7.4-alpine')
+    .withTmpFs({ '/data': 'rw' })
     .withExposedPorts(6379)
     .withWaitStrategy(Wait.forLogMessage('Ready to accept connections'))
     .start();
@@ -17,6 +23,7 @@ export function startRedis(): Promise<StartedTestContainer> {
 export function startMinio(): Promise<StartedTestContainer> {
   return new GenericContainer('pgsty/minio:RELEASE.2026-08-04T00-00-00Z')
     .withCommand(['server', '/data'])
+    .withTmpFs({ '/data': 'rw' })
     .withEnvironment({ MINIO_ROOT_USER: MINIO_CREDENTIALS.user, MINIO_ROOT_PASSWORD: MINIO_CREDENTIALS.password })
     .withExposedPorts(9000)
     .withWaitStrategy(Wait.forHttp('/minio/health/live', 9000))

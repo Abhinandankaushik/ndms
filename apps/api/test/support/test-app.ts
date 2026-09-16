@@ -7,6 +7,7 @@ import { Client } from 'pg';
 import request from 'supertest';
 import type { StartedTestContainer } from 'testcontainers';
 import { AppModule } from '../../src/app.module';
+import { RateLimitGuard } from '../../src/common/rate-limit/rate-limit.guard';
 import { configureApp } from '../../src/app.setup';
 import { ENV, parseEnv, type Env } from '../../src/config/env';
 import { MINIO_CREDENTIALS, startMinio, startPostgis, startRedis } from './containers';
@@ -64,7 +65,7 @@ export async function seedDarbhanga(db: Client): Promise<number> {
 
 export async function createTestApp(
   stack: TestStack,
-  options: { imports?: ModuleMetadata['imports']; env?: Record<string, string> } = {},
+  options: { imports?: ModuleMetadata['imports']; env?: Record<string, string>; rateLimit?: boolean } = {},
 ): Promise<TestApp> {
   const db = new Client({ connectionString: stack.postgres.getConnectionUri() });
   await db.connect();
@@ -86,10 +87,15 @@ export async function createTestApp(
     ...options.env,
   });
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule, ...(options.imports ?? [])] })
+  const builder = Test.createTestingModule({ imports: [AppModule, ...(options.imports ?? [])] })
     .overrideProvider(ENV)
-    .useValue(env)
-    .compile();
+    .useValue(env);
+  // Specs sign in many users from 127.0.0.1, which the per-IP OTP limit would reject;
+  // only the spec that tests limiting asks for the real guard.
+  if (!options.rateLimit) {
+    builder.overrideProvider(RateLimitGuard).useValue({ canActivate: () => true });
+  }
+  const moduleRef = await builder.compile();
   const app = configureApp(moduleRef.createNestApplication());
   await app.listen(0, '127.0.0.1');
   const address = app.getHttpServer().address() as { port: number };

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
+import { RateLimit } from '../../common/rate-limit/rate-limit.decorator';
 import { uuidParam, zodBody, zodQuery } from '../../common/validation/zod-validation.pipe';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
 import type { AuthUser } from '../auth/auth-user';
@@ -38,6 +39,7 @@ export class IncidentsController {
   }
 
   @Post()
+  @RateLimit({ bucket: 'incident-report', limit: 10, windowSeconds: 60 * 60 })
   async report(
     @Body(zodBody(reportSchema)) body: ReportInput,
     @CurrentUser() user: AuthUser,
