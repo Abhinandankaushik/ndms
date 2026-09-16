@@ -156,7 +156,9 @@ function MapLegend({
   hoveredCell: HeatmapCell | null;
   className?: string;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  // Collapsed by default: open, it covers most of the map on a laptop screen. The incident
+  // count and the truncation warning stay visible either way.
+  const [expanded, setExpanded] = useState(false);
   const contentId = useId();
 
   return (

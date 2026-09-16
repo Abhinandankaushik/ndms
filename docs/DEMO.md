@@ -65,8 +65,8 @@ Sign in as the officer. The control room opens on Darbhanga with the seeded pict
 active incidents, people affected, pending reviews, teams available, shelter load.
 
 Say: *every number here is a database query against one district's live data, not a mock.*
-The map is viewport-bounded — it loads the incidents in view, not the whole table — and the
-legend explains the marker colours. The right-hand panel is the priority queue:
+The map is viewport-bounded — it loads the incidents in view, not the whole table, and the
+panel at the top-left says how many. Open it for the legend that explains the colours. The right-hand panel is the priority queue:
 `ORDER BY priority_score DESC, reported_at ASC`. `reported_at` is the *device's* clock, not
 the server's, so a report that sat in a phone's outbox for two hours ranks as older and
 more urgent, not newer. It is clamped in SQL to the last 24 hours, so a wrong phone clock
