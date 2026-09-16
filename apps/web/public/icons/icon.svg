@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="NDMS">
+  <rect width="512" height="512" rx="112" fill="#ffffff" />
+  <path
+    d="M256 64 96 128v128c0 96 64 168 160 192 96-24 160-96 160-192V128L256 64Z"
+    fill="#b91c1c"
+  />
+  <path
+    d="M256 160v112"
+    stroke="#ffffff"
+    stroke-width="36"
+    stroke-linecap="round"
+  />
+  <circle cx="256" cy="336" r="22" fill="#ffffff" />
+</svg>
