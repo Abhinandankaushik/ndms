@@ -40,7 +40,7 @@ export function TeamsPanel({
       <p className="border-b px-3 py-2 text-xs text-muted-foreground">
         {available} of {teams.length} teams available · select a team to find it on the map
       </p>
-      <ul className="min-h-0 flex-1 divide-y overflow-y-auto">
+      <ul className="relative min-h-0 flex-1 divide-y overflow-y-auto">
         {teams.map((team) => {
           const mission = team.activeMissionId ? openMissionsById.get(team.activeMissionId) : undefined;
           const stale = isStalePosition(team, now);

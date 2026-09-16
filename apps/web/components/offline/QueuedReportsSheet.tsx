@@ -41,7 +41,7 @@ export function QueuedReportsSheet({ open, onOpenChange, waiting, blocked, isSen
           </SheetDescription>
         </SheetHeader>
 
-        <ul className="min-h-0 flex-1 overflow-y-auto border-t px-4 py-3">
+        <ul className="relative min-h-0 flex-1 overflow-y-auto border-t px-4 py-3">
           {entries.map((entry) => (
             <QueuedReportRow key={entry.clientUuid} entry={entry} isOnline={isOnline} now={now} />
           ))}

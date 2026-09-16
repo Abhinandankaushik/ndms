@@ -54,7 +54,9 @@ export function IncidentQueuePanel({ className }: { className?: string }) {
         )}
       </header>
 
-      <div className={cn('min-h-0 flex-1 overflow-y-auto transition-opacity', isPlaceholderData && 'opacity-60')}>
+      {/* relative: sr-only labels inside the rows are absolutely positioned, and without a
+          positioned scroll container they escape the clip and stretch the whole document. */}
+      <div className={cn('relative min-h-0 flex-1 overflow-y-auto transition-opacity', isPlaceholderData && 'opacity-60')}>
         {isPending ? (
           <ListSkeleton rows={6} />
         ) : error && !data ? (

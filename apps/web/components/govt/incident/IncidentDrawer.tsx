@@ -128,7 +128,7 @@ function IncidentDetails({ incident }: { incident: IncidentDetail }) {
         </SheetDescription>
       </SheetHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="grid gap-3 border-b p-4">
           <div className="flex flex-wrap gap-2">
             {isOpenIncident(incident.status) && (
