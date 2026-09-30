@@ -297,6 +297,26 @@ walkthrough is `docs/DEMO.md`.
   `position: static`, those spans escape the clip and stretch the document — the officer
   dashboard grew to 4,795 px against a 760 px viewport. Scroll containers need `relative`.
 - `GET /incidents/mine` caps at the 100 newest, so counting it cannot prove a sync arrived.
+- **The seed buries new reports.** 10,000 seeded incidents score 74–84; a fresh SOS scores
+  ~45, so it ranks ~4,850 of ~6,650 open ones and the priority queue only serves 200. A new
+  report is on the map and in the toast but not in the queue. That is the queue working as
+  designed, not a realtime fault — check `sort=newest` or search before debugging sockets.
+- OTP limits bite when running the e2e suites back to back: 5 sends per phone per 15 min
+  (`otp:sends:<phone>`) and 30 verifies per IP (`ratelimit:otp-verify:ip:*`). Two runs inside
+  one window exhaust them and every spec then fails at the login screen, which looks like a
+  UI break. Clear both key patterns in Redis between runs. `demo`/`criteria` use `…0001`
+  and `…00013`; `incident-search` uses `…0002` and `…00014` so it does not compete.
+- Measure O3 against `pnpm --filter @ndms/web build && start`, never `next dev`: the dev
+  server renders the same map in 3.8–5.6 s against 1.1 s built, and fails the < 2 s target.
+
+**Incident search (2026-09-21).** `GET /incidents/search?q=` picks a branch from the shape of
+the term — full id, reporter phone, id prefix, else trigram text over `address_text` and
+`description` (migration `20260921090000`, `pnpm db:verify-search`). Phone is tested before
+id prefix because digits are valid hex, and matches on trailing digits so `9000000001` and
+`+919000000001` both work; it is `GOVT_OFFICIAL`-only. `GET /incidents/queue` gained
+`sort=priority|newest` and a `from`/`to` window. The officer dashboard has a search box, the
+SOS toast has an "Open this report" action, and `compareQueueOrder` now takes the sort so a
+socket-patched row lands where the server would have put it.
 
 **District:** Darbhanga, Bihar (see §9). Data acquisition is complete; `data/SOURCES.md`
 is the record.
