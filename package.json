@@ -12,6 +12,7 @@
     "db:migrate": "docker compose run --rm migrate",
     "db:psql": "docker compose exec postgres psql",
     "db:verify-indexes": "docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -f - < infra/verify/spatial-index.sql",
+    "db:verify-search": "docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -f - < infra/verify/search-index.sql",
     "data:boundary": "docker compose run --rm gdal sh tools/data/extract-district-boundary.sh",
     "api:dev": "pnpm --filter @ndms/api start:dev",
     "typecheck": "pnpm -r typecheck",
