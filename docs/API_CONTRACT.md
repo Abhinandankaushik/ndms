@@ -80,7 +80,8 @@ as `CITIZEN`.
 | `POST /incidents/sos` | any | `{ clientUuid, lat?, lon?, accuracyM?, reportedAt, type? = OTHER, peopleAffected? = 1 }` | 201 new / 200 replay: `{ id, districtId, status, reportedAt, wasInserted }`; 409 `CLIENT_UUID_CONFLICT` |
 | `POST /incidents` | any | `{ clientUuid, lat?, lon?, accuracyM?, locationSource? (GPS\|MANUAL_PIN), reportedAt, type, description?, addressText?, peopleAffected?, hasElderly?, hasChildren?, hasInjured? }` | same as SOS |
 | `GET /incidents?bbox=&status=&type=&limit=` | GOVT_OFFICIAL, RESCUE_TEAM | status/type are CSV; defaults to open statuses | `MapMarker[]` = `{ id, type, status, isSos, lat, lon, accuracyM, priorityScore, peopleAffected, reportedAt }` |
-| `GET /incidents/queue?status=&type=&sosOnly=&limit=&offset=` | GOVT_OFFICIAL, RESCUE_TEAM | — | `Incident[]` sorted by `priorityScore DESC NULLS LAST, reportedAt ASC` |
+| `GET /incidents/queue?status=&type=&sosOnly=&sort=&from=&to=&limit=&offset=` | GOVT_OFFICIAL, RESCUE_TEAM | `sort` = `priority` (default) or `newest`; `from`/`to` are ISO timestamps bounding `reportedAt` | `Incident[]` sorted by `priorityScore DESC NULLS LAST, reportedAt ASC`, or by `reportedAt DESC` when `sort=newest` |
+| `GET /incidents/search?q=&from=&to=&limit=&offset=` | GOVT_OFFICIAL, RESCUE_TEAM | `q` ≥ 2 chars; `from`/`to` bound `reportedAt` | `Incident[]` newest first, `meta.match` names the branch that ran |
 | `GET /incidents/mine` | any | — | `Incident[]` newest first |
 | `GET /incidents/:id` | reporter, in-district responder | — | `Incident & { timeline: { fromStatus, toStatus, changedBy, note, changedAt }[] }` |
 | `PATCH /incidents/:id` | reporter, in-district official | `{ type?, description?, addressText?, peopleAffected?, hasElderly?, hasChildren?, hasInjured?, manualPin?: { lat, lon } }` | `Incident` |
@@ -96,6 +97,25 @@ as `CITIZEN`.
 locationSource, accuracyM, addressText, description, peopleAffected, hasElderly,
 hasChildren, hasInjured, priorityScore, severityLevel, duplicateOf, reportedAt, createdAt,
 updatedAt, resolvedAt }`.
+
+`GET /incidents/search` picks one branch from the shape of `q`, so a single box serves every
+lookup an officer makes. `meta.match` reports which ran:
+
+| `q` looks like | Branch | Matches |
+|---|---|---|
+| a full UUID | `id` | that incident |
+| 6–15 digits, optional `+`, spaces and dashes | `phone` | every incident whose reporter's number ends with those digits, so `9000000001` and `+919000000001` both find the same reporter |
+| 8–31 hex chars | `id_prefix` | incidents whose id starts with it |
+| anything else | `text` | substring of `addressText` or `description`, ranked by trigram similarity |
+
+Phone is tested before the id prefix because digits are also valid hex — otherwise
+`9000000001` would be read as the start of an id rather than the number someone typed. An id
+prefix that is all digits is therefore unreachable; paste the full UUID for those.
+
+Search is always scoped to the caller's district and never returns an incident the caller
+could not already open. The `phone` branch is `GOVT_OFFICIAL`-only: a rescue team searching a
+phone number gets `403 PHONE_SEARCH_FORBIDDEN`, because it would expose reporter contact
+details outside the control room.
 
 Status workflow: officials can move `REPORTED → VERIFIED | ASSIGNED | RESOLVED |
 REJECTED_*`, `VERIFIED → ASSIGNED | RESOLVED | REJECTED_*`, `ASSIGNED → IN_PROGRESS |
