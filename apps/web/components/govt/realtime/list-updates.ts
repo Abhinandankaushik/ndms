@@ -19,6 +19,7 @@ import {
   type MissionStatus,
   type MissionStatusChangedEvent,
   type PendingReview,
+  type QueueSort,
   type ResourceRow,
   type Team,
   type TeamLocationEvent,
@@ -77,10 +78,18 @@ export function matchesQueue(incident: Pick<Incident, 'status' | 'type' | 'isSos
 
 // GET /incidents/queue order: priorityScore DESC NULLS LAST, then the oldest report first. An unscored report sits
 // after the scored ones but stays visible.
+// Mirrors the server's ORDER BY for each sort. A patched row placed by the wrong one would
+// sit in the wrong slot until the next refetch, which under `newest` is exactly the row the
+// officer is watching for.
 export function compareQueueOrder(
-  a: Pick<Incident, 'priorityScore' | 'reportedAt'>,
-  b: Pick<Incident, 'priorityScore' | 'reportedAt'>,
+  a: Pick<Incident, 'id' | 'priorityScore' | 'reportedAt'>,
+  b: Pick<Incident, 'id' | 'priorityScore' | 'reportedAt'>,
+  sort: QueueSort = 'priority',
 ): number {
+  if (sort === 'newest') {
+    const byNewest = Date.parse(b.reportedAt) - Date.parse(a.reportedAt);
+    return byNewest !== 0 ? byNewest : a.id.localeCompare(b.id);
+  }
   if (a.priorityScore !== b.priorityScore) {
     if (a.priorityScore === null) return 1;
     if (b.priorityScore === null) return -1;
@@ -128,17 +137,18 @@ export function queueWithIncident(
   const limit = query.limit ?? QUEUE_DEFAULT_LIMIT;
   const index = list.findIndex((entry) => entry.id === incident.id);
   const belongs = matchesQueue(incident, query);
+  const order = (a: Incident, b: Incident) => compareQueueOrder(a, b, query.sort);
 
   if (index === -1) {
     if (!belongs) return null;
     if ((query.offset ?? 0) > 0) return staleOnly();
-    const next = insertSorted(list, incident, compareQueueOrder).slice(0, limit);
+    const next = insertSorted(list, incident, order).slice(0, limit);
     return next.some((entry) => entry.id === incident.id) ? { next, stale: false } : null;
   }
 
   const rest = withoutIndex(list, index);
   if (!belongs) return { next: rest, stale: list.length >= limit };
-  return { next: insertSorted(rest, incident, compareQueueOrder), stale: false };
+  return { next: insertSorted(rest, incident, order), stale: false };
 }
 
 export function queueWithCreatedIncident(
@@ -174,6 +184,8 @@ export function queueWithEnrichment(
   const index = list.findIndex((entry) => entry.id === event.id);
   const current = list[index];
   if (!current) {
+    // Under `newest` a score cannot move a row into view, so an absent one stays absent.
+    if (query.sort === 'newest') return null;
     const limit = query.limit ?? QUEUE_DEFAULT_LIMIT;
     const last = list.at(-1);
     if (list.length < limit || !last || event.priorityScore === null) return null;
