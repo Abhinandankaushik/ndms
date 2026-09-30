@@ -19,8 +19,10 @@ import {
   DISASTER_TYPES,
   INCIDENT_STATUSES,
   OPEN_INCIDENT_STATUSES,
+  QUEUE_SORTS,
   type DisasterType,
   type IncidentStatus,
+  type QueueSort,
 } from '@/lib/api/types';
 import { DISASTER_TYPE_LABELS, INCIDENT_STATUS_LABELS } from '@/lib/labels';
 import { cn } from '@/lib/utils';
@@ -36,6 +38,17 @@ import {
   toggleTypeFilter,
   useIncidentFilters,
 } from './incident-filters';
+import {
+  TIME_WINDOWS,
+  isDefaultIncidentSearch,
+  isSearching,
+  resetIncidentSearch,
+  setQueueSort,
+  setTimeWindow,
+  useIncidentSearch,
+  type TimeWindowId,
+} from './incident-search';
+import { IncidentSearchBox } from './IncidentSearchBox';
 
 // Selecting an item would otherwise close the menu after every tick of a multi-select.
 const keepMenuOpen = (event: Event) => event.preventDefault();
@@ -45,20 +58,43 @@ export function IncidentFilterBar({ className }: { className?: string }) {
   const sosSwitchId = useId();
   const { data: district } = useQuery(districtQuery());
 
+  const search = useIncidentSearch();
+  const searching = isSearching(search.term);
+  const isDefault = isDefaultIncidentFilters(filters) && isDefaultIncidentSearch(search);
+
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
+      <IncidentSearchBox className="w-full sm:w-72" />
+      {/* Every control except the time window shapes the queue. A search deliberately spans
+          all statuses and types — that is how a resolved or rejected report stays findable —
+          so showing them while one runs would promise filtering that is not applied. */}
       <div role="group" aria-label="Incident filters" className="flex flex-wrap items-center gap-2">
         <ListFilter aria-hidden className="size-4 text-muted-foreground" />
-        <StatusFilterMenu selected={filters.statuses} />
-        <TypeFilterMenu selected={filters.types} />
-        <div className="flex h-9 items-center gap-2 rounded-md border bg-background px-3">
-          <Switch id={sosSwitchId} checked={filters.sosOnly} onCheckedChange={setSosOnly} />
-          <Label htmlFor={sosSwitchId} className="text-sm font-normal">
-            SOS only
-          </Label>
-        </div>
-        {!isDefaultIncidentFilters(filters) && (
-          <Button variant="ghost" size="sm" onClick={resetIncidentFilters}>
+        {!searching && (
+          <>
+            <StatusFilterMenu selected={filters.statuses} />
+            <TypeFilterMenu selected={filters.types} />
+            <SortMenu selected={search.sort} />
+          </>
+        )}
+        <TimeWindowMenu selected={search.window} />
+        {!searching && (
+          <div className="flex h-9 items-center gap-2 rounded-md border bg-background px-3">
+            <Switch id={sosSwitchId} checked={filters.sosOnly} onCheckedChange={setSosOnly} />
+            <Label htmlFor={sosSwitchId} className="text-sm font-normal">
+              SOS only
+            </Label>
+          </div>
+        )}
+        {!isDefault && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              resetIncidentFilters();
+              resetIncidentSearch();
+            }}
+          >
             <RotateCcw />
             Reset
           </Button>
@@ -70,6 +106,65 @@ export function IncidentFilterBar({ className }: { className?: string }) {
         </p>
       )}
     </div>
+  );
+}
+
+const SORT_LABELS: Record<QueueSort, string> = {
+  priority: 'Highest priority',
+  newest: 'Newest first',
+};
+
+function SortMenu({ selected }: { selected: QueueSort }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className="min-w-40 justify-between">
+          <span>
+            <span className="sr-only">Sort: </span>
+            {SORT_LABELS[selected]}
+          </span>
+          <ChevronDown className="opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuLabel>Sort the queue by</DropdownMenuLabel>
+        {QUEUE_SORTS.map((sort) => (
+          <DropdownMenuCheckboxItem key={sort} checked={selected === sort} onCheckedChange={() => setQueueSort(sort)}>
+            {SORT_LABELS[sort]}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function TimeWindowMenu({ selected }: { selected: TimeWindowId }) {
+  const label = TIME_WINDOWS.find((entry) => entry.id === selected)?.label ?? 'Any time';
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className="min-w-36 justify-between">
+          <span>
+            <span className="sr-only">Reported: </span>
+            {label}
+          </span>
+          <ChevronDown className="opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-48">
+        <DropdownMenuLabel>Reported within</DropdownMenuLabel>
+        {TIME_WINDOWS.map((entry) => (
+          <DropdownMenuCheckboxItem
+            key={entry.id}
+            checked={selected === entry.id}
+            onCheckedChange={() => setTimeWindow(entry.id)}
+          >
+            {entry.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

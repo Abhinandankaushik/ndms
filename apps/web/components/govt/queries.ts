@@ -3,7 +3,7 @@ import { listAlerts } from '@/lib/api/endpoints/alerts';
 import { getDashboardSummary, getIncidentHeatmap, getResourceOverview } from '@/lib/api/endpoints/dashboard';
 import { getMyDistrict } from '@/lib/api/endpoints/districts';
 import { listFacilities } from '@/lib/api/endpoints/facilities';
-import { getIncident, getIncidentQueue, listIncidentMarkers } from '@/lib/api/endpoints/incidents';
+import { getIncident, getIncidentQueue, listIncidentMarkers, searchIncidents } from '@/lib/api/endpoints/incidents';
 import { listIncidentMedia } from '@/lib/api/endpoints/media';
 import { listMissions } from '@/lib/api/endpoints/missions';
 import { listPendingReviews } from '@/lib/api/endpoints/reviews';
@@ -14,6 +14,7 @@ import type {
   Bbox,
   HeatmapQuery,
   IncidentQueueQuery,
+  IncidentSearchQuery,
   MapMarkerQuery,
   MissionListQuery,
   NearestTeamsQuery,
@@ -55,6 +56,15 @@ export const incidentQueueQuery = (query: IncidentQueueQuery) =>
   queryOptions({
     queryKey: queryKeys.incidents.queue(query),
     queryFn: ({ signal }) => getIncidentQueue(query, { signal }),
+  });
+
+// Unlike the queue, results are not patched by socket events: a search is a question asked at
+// a moment, and silently rewriting the answer underneath the officer would be worse than stale.
+export const incidentSearchQuery = (query: IncidentSearchQuery) =>
+  queryOptions({
+    queryKey: queryKeys.incidents.search(query),
+    queryFn: ({ signal }) => searchIncidents(query, { signal }),
+    staleTime: 30_000,
   });
 
 export const incidentMarkersQuery = (query: MapMarkerQuery) =>

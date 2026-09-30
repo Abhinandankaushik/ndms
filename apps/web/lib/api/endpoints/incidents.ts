@@ -1,16 +1,19 @@
-import { apiFetch, type CallOptions } from '../client';
+import { apiFetch, apiFetchWithMeta, type CallOptions } from '../client';
 import type {
   Incident,
   IncidentDetail,
   IncidentDetailsPatch,
   IncidentFlagInput,
   IncidentQueueQuery,
+  IncidentSearchQuery,
+  IncidentSearchResult,
   IncidentStatusChange,
   MapMarker,
   MapMarkerQuery,
   ReportInput,
   ReportReceipt,
   Review,
+  SearchMatch,
   SosInput,
 } from '../types';
 
@@ -38,10 +41,24 @@ export function getIncidentQueue(query: IncidentQueueQuery = {}, options?: CallO
       status: query.status,
       type: query.type,
       sosOnly: query.sosOnly,
+      sort: query.sort,
+      from: query.from,
+      to: query.to,
       limit: query.limit,
       offset: query.offset,
     },
   });
+}
+
+export async function searchIncidents(
+  query: IncidentSearchQuery,
+  options?: CallOptions,
+): Promise<IncidentSearchResult> {
+  const { data, meta } = await apiFetchWithMeta<Incident[]>('/incidents/search', {
+    ...options,
+    query: { q: query.q, from: query.from, to: query.to, limit: query.limit },
+  });
+  return { incidents: data, match: (meta?.match as SearchMatch | undefined) ?? 'text' };
 }
 
 export function listMyIncidents(options?: CallOptions): Promise<Incident[]> {

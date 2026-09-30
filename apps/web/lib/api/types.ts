@@ -225,12 +225,33 @@ export interface MapMarkerQuery {
   limit?: number;
 }
 
+export const QUEUE_SORTS = ['priority', 'newest'] as const;
+export type QueueSort = (typeof QUEUE_SORTS)[number];
+
 export interface IncidentQueueQuery {
   status?: readonly IncidentStatus[];
   type?: readonly DisasterType[];
   sosOnly?: boolean;
+  sort?: QueueSort;
+  from?: string;
+  to?: string;
   limit?: number;
   offset?: number;
+}
+
+export const SEARCH_MATCHES = ['id', 'id_prefix', 'phone', 'text'] as const;
+export type SearchMatch = (typeof SEARCH_MATCHES)[number];
+
+export interface IncidentSearchQuery {
+  q: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export interface IncidentSearchResult {
+  incidents: Incident[];
+  match: SearchMatch;
 }
 
 export interface IncidentDetailsPatch {

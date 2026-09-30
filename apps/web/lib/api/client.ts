@@ -1,6 +1,12 @@
 import { refreshAccessToken, useSessionStore, type SessionStatus } from '@/lib/auth/session';
 import { ApiError } from './api-error';
-import { sendApiRequest, type RequestOptions } from './request';
+import {
+  sendApiRequest,
+  sendApiRequestWithMeta,
+  type EnvelopeResult,
+  type RequestOptions,
+  type TransportOptions,
+} from './request';
 
 export { ApiError, isAbortError, isApiError, NETWORK_ERROR } from './api-error';
 export { API_BASE_PATH, buildApiUrl, type HttpMethod, type QueryParams, type QueryValue } from './request';
@@ -14,18 +20,31 @@ export type CallOptions = Pick<RequestOptions, 'signal'>;
 
 const REFRESHABLE_CODES = new Set(['TOKEN_INVALID', 'AUTH_REQUIRED']);
 
-export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+export function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+  return callApi(sendApiRequest<T>, path, options);
+}
+
+/** For the few endpoints whose answer needs the envelope's `meta`, not just its `data`. */
+export function apiFetchWithMeta<T>(path: string, options: ApiFetchOptions = {}): Promise<EnvelopeResult<T>> {
+  return callApi(sendApiRequestWithMeta<T>, path, options);
+}
+
+async function callApi<R>(
+  send: (path: string, options: TransportOptions) => Promise<R>,
+  path: string,
+  options: ApiFetchOptions,
+): Promise<R> {
   const { auth = true, ...request } = options;
-  if (!auth) return sendApiRequest<T>(path, request);
+  if (!auth) return send(path, request);
 
   const { accessToken: tokenUsed, status: statusWhenSent } = useSessionStore.getState();
   try {
-    return await sendApiRequest<T>(path, { ...request, accessToken: tokenUsed });
+    return await send(path, { ...request, accessToken: tokenUsed });
   } catch (error) {
     if (!isRecoverableAuthError(error, tokenUsed, statusWhenSent)) throw error;
     const freshToken = await tokenNewerThan(tokenUsed);
     if (!freshToken) throw error;
-    return sendApiRequest<T>(path, { ...request, accessToken: freshToken });
+    return send(path, { ...request, accessToken: freshToken });
   }
 }
 

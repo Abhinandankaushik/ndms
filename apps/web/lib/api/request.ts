@@ -34,7 +34,16 @@ export function buildApiUrl(path: string, query?: QueryParams): string {
   return `${API_BASE_PATH}${path}${queryString ? `?${queryString}` : ''}`;
 }
 
+export interface EnvelopeResult<T> {
+  data: T;
+  meta: Record<string, unknown> | null;
+}
+
 export async function sendApiRequest<T>(path: string, options: TransportOptions = {}): Promise<T> {
+  return (await sendApiRequestWithMeta<T>(path, options)).data;
+}
+
+export async function sendApiRequestWithMeta<T>(path: string, options: TransportOptions = {}): Promise<EnvelopeResult<T>> {
   const response = await fetchOrNetworkError(buildApiUrl(path, options.query), {
     method: options.method ?? 'GET',
     headers: requestHeaders(options),
@@ -66,10 +75,10 @@ async function fetchOrNetworkError(url: string, init: RequestInit): Promise<Resp
   }
 }
 
-async function unwrapEnvelope<T>(response: Response): Promise<T> {
+async function unwrapEnvelope<T>(response: Response): Promise<EnvelopeResult<T>> {
   const envelope = await readEnvelope<T>(response);
   if (response.ok && envelope?.success) {
-    return envelope.data as T;
+    return { data: envelope.data as T, meta: envelope.meta ?? null };
   }
   if (envelope?.error) {
     throw new ApiError(response.status, envelope.error.code, envelope.error.message, envelope.error.details);
