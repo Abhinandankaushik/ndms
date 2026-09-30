@@ -16,14 +16,18 @@ import {
   type IncidentRecord,
   type MapMarker,
   type NewIncident,
+  type ReportedWindow,
   type StatusLogEntry,
   type UpsertResult,
 } from './incidents.repository';
 import {
+  classifySearchTerm,
   DEFAULT_MAP_STATUSES,
   type MapQuery,
   type QueueQuery,
   type ReportInput,
+  type SearchMatch,
+  type SearchQuery,
   type SosInput,
   type StatusChangeInput,
   type UpdateDetailsInput,
@@ -38,6 +42,11 @@ export interface ReportReceipt {
 }
 
 const notFound = () => new NotFoundException({ code: 'INCIDENT_NOT_FOUND', message: 'Incident not found' });
+
+const windowOf = (query: { from?: string; to?: string }): ReportedWindow => ({
+  from: query.from ? new Date(query.from) : null,
+  to: query.to ? new Date(query.to) : null,
+});
 
 export type MissionDrivenStatus = 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'VERIFIED';
 
@@ -124,9 +133,46 @@ export class IncidentsService {
       query.status ?? DEFAULT_MAP_STATUSES,
       query.type ?? null,
       query.sosOnly ?? false,
+      query.sort,
+      windowOf(query),
       query.limit,
       query.offset,
     );
+  }
+
+  async search(query: SearchQuery, user: AuthUser): Promise<{ incidents: IncidentRecord[]; match: SearchMatch }> {
+    const districtId = this.scopedDistrict(user);
+    const window = windowOf(query);
+    const { match, term } = classifySearchTerm(query.q);
+
+    if (match === 'phone' && user.role !== 'GOVT_OFFICIAL') {
+      throw new ForbiddenException({
+        code: 'PHONE_SEARCH_FORBIDDEN',
+        message: 'Only a government official can search by reporter phone',
+      });
+    }
+
+    const incidents = await this.runSearch(match, districtId, term, window, query);
+    return { incidents, match };
+  }
+
+  private runSearch(
+    match: SearchMatch,
+    districtId: number,
+    term: string,
+    window: ReportedWindow,
+    query: SearchQuery,
+  ): Promise<IncidentRecord[]> {
+    switch (match) {
+      case 'id':
+        return this.incidents.searchById(districtId, term, window);
+      case 'id_prefix':
+        return this.incidents.searchByIdPrefix(districtId, term, window, query.limit, query.offset);
+      case 'phone':
+        return this.incidents.searchByReporterPhone(districtId, term, window, query.limit, query.offset);
+      case 'text':
+        return this.incidents.searchByText(districtId, term, window, query.limit, query.offset);
+    }
   }
 
   mine(user: AuthUser): Promise<IncidentRecord[]> {

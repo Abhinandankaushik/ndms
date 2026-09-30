@@ -78,14 +78,67 @@ export const mapQuerySchema = z.object({
 });
 export type MapQuery = z.infer<typeof mapQuerySchema>;
 
-export const queueQuerySchema = z.object({
-  status: csvOf(INCIDENT_STATUSES).optional(),
-  type: csvOf(DISASTER_TYPES).optional(),
-  sosOnly: z.stringbool().optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-  offset: z.coerce.number().int().min(0).default(0),
-});
+const reportedWindow = {
+  from: z.iso.datetime({ offset: true }).optional(),
+  to: z.iso.datetime({ offset: true }).optional(),
+};
+
+const windowIsOrdered = (value: { from?: string; to?: string }) =>
+  value.from === undefined || value.to === undefined || value.from <= value.to;
+const windowIssue = { message: 'from must not be after to', path: ['from'] };
+
+export const QUEUE_SORTS = ['priority', 'newest'] as const;
+export type QueueSort = (typeof QUEUE_SORTS)[number];
+
+export const queueQuerySchema = z
+  .object({
+    status: csvOf(INCIDENT_STATUSES).optional(),
+    type: csvOf(DISASTER_TYPES).optional(),
+    sosOnly: z.stringbool().optional(),
+    sort: z.enum(QUEUE_SORTS).default('priority'),
+    ...reportedWindow,
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .refine(windowIsOrdered, windowIssue);
 export type QueueQuery = z.infer<typeof queueQuerySchema>;
+
+export const searchQuerySchema = z
+  .object({
+    q: z.string().trim().min(2).max(200),
+    ...reportedWindow,
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .refine(windowIsOrdered, windowIssue);
+export type SearchQuery = z.infer<typeof searchQuerySchema>;
+
+export const SEARCH_MATCHES = ['id', 'id_prefix', 'phone', 'text'] as const;
+export type SearchMatch = (typeof SEARCH_MATCHES)[number];
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PHONE_PATTERN = /^\+?[\d\s-]+$/;
+const ID_PREFIX_PATTERN = /^[0-9a-f]{8,31}$/i;
+
+/**
+ * One box serves every lookup, so the shape of the term picks the branch (contract §Incidents).
+ * Phone is tested before id prefix because digits are also valid hex: without that order
+ * `9000000001` would be read as the start of an id rather than the number someone typed.
+ */
+export function classifySearchTerm(raw: string): { match: SearchMatch; term: string } {
+  const term = raw.trim();
+  if (UUID_PATTERN.test(term)) return { match: 'id', term: term.toLowerCase() };
+
+  const digits = term.replace(/[\s-]/g, '');
+  if (PHONE_PATTERN.test(term) && digits.replace('+', '').length >= 6 && digits.replace('+', '').length <= 15) {
+    return { match: 'phone', term: digits };
+  }
+
+  const hex = term.replace(/-/g, '');
+  if (ID_PREFIX_PATTERN.test(hex)) return { match: 'id_prefix', term: hex.toLowerCase() };
+
+  return { match: 'text', term };
+}
 
 export const statusChangeSchema = z
   .object({

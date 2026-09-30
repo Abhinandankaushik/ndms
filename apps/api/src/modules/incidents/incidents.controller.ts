@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
+import { withMeta } from '../../common/http/api-envelope';
 import { RateLimit } from '../../common/rate-limit/rate-limit.decorator';
 import { uuidParam, zodBody, zodQuery } from '../../common/validation/zod-validation.pipe';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
@@ -8,12 +9,14 @@ import {
   mapQuerySchema,
   queueQuerySchema,
   reportSchema,
+  searchQuerySchema,
   sosSchema,
   statusChangeSchema,
   updateDetailsSchema,
   type MapQuery,
   type QueueQuery,
   type ReportInput,
+  type SearchQuery,
   type SosInput,
   type StatusChangeInput,
   type UpdateDetailsInput,
@@ -58,6 +61,14 @@ export class IncidentsController {
   @Roles('GOVT_OFFICIAL', 'RESCUE_TEAM')
   queue(@Query(zodQuery(queueQuerySchema)) query: QueueQuery, @CurrentUser() user: AuthUser) {
     return this.incidents.queue(query, user);
+  }
+
+  // Declared before `:id` so the literal path wins the route match.
+  @Get('search')
+  @Roles('GOVT_OFFICIAL', 'RESCUE_TEAM')
+  async search(@Query(zodQuery(searchQuerySchema)) query: SearchQuery, @CurrentUser() user: AuthUser) {
+    const { incidents, match } = await this.incidents.search(query, user);
+    return withMeta(incidents, { match, count: incidents.length });
   }
 
   @Get('mine')

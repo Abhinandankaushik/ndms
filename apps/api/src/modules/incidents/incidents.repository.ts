@@ -2,6 +2,12 @@ import { Injectable } from '@nestjs/common';
 import type { DisasterType, IncidentStatus, LocationSource } from '../../common/domain/enums';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../infra/database/prisma.service';
+import type { QueueSort } from './incidents.schemas';
+
+export interface ReportedWindow {
+  from: Date | null;
+  to: Date | null;
+}
 
 // Enums come back as text and NUMERIC as float8 so rows serialise to JSON without
 // Prisma Decimal objects.
@@ -263,14 +269,22 @@ export class IncidentsRepository {
   }
 
   // Unscored reports sort after scored ones but stay visible, oldest first (plan §A2.3).
+  // `newest` exists because that ordering buries a fresh report under every scored one:
+  // it is the only way an officer sees a report that has just arrived.
   async findQueue(
     districtId: number,
     statuses: readonly IncidentStatus[],
     types: readonly DisasterType[] | null,
     sosOnly: boolean,
+    sort: QueueSort,
+    window: ReportedWindow,
     limit: number,
     offset: number,
   ): Promise<IncidentRecord[]> {
+    const order =
+      sort === 'newest'
+        ? Prisma.raw('i.reported_at DESC, i.id')
+        : Prisma.raw('i.priority_score DESC NULLS LAST, i.reported_at ASC');
     const rows = await this.prisma.$queryRaw<IncidentRow[]>`
       SELECT ${INCIDENT_COLUMNS}
       FROM incidents i
@@ -278,7 +292,90 @@ export class IncidentsRepository {
         AND i.status = ANY(${[...statuses]}::incident_status[])
         AND (${types ? [...types] : null}::disaster_type[] IS NULL OR i.type = ANY(${types ? [...types] : null}::disaster_type[]))
         AND (NOT ${sosOnly}::boolean OR i.is_sos)
-      ORDER BY i.priority_score DESC NULLS LAST, i.reported_at ASC
+        AND (${window.from}::timestamptz IS NULL OR i.reported_at >= ${window.from}::timestamptz)
+        AND (${window.to}::timestamptz IS NULL OR i.reported_at <= ${window.to}::timestamptz)
+      ORDER BY ${order}
+      LIMIT ${limit}::int OFFSET ${offset}::int`;
+    return rows.map(toRecord);
+  }
+
+  async searchById(districtId: number, id: string, window: ReportedWindow): Promise<IncidentRecord[]> {
+    const rows = await this.prisma.$queryRaw<IncidentRow[]>`
+      SELECT ${INCIDENT_COLUMNS}
+      FROM incidents i
+      WHERE i.district_id = ${districtId}::int
+        AND i.id = ${id}::uuid
+        AND (${window.from}::timestamptz IS NULL OR i.reported_at >= ${window.from}::timestamptz)
+        AND (${window.to}::timestamptz IS NULL OR i.reported_at <= ${window.to}::timestamptz)`;
+    return rows.map(toRecord);
+  }
+
+  async searchByIdPrefix(
+    districtId: number,
+    prefix: string,
+    window: ReportedWindow,
+    limit: number,
+    offset: number,
+  ): Promise<IncidentRecord[]> {
+    // Matches the text_pattern_ops index from 20260921090000; the dashes are stripped from
+    // the term, so the pattern is built against the id with its dashes removed too.
+    const rows = await this.prisma.$queryRaw<IncidentRow[]>`
+      SELECT ${INCIDENT_COLUMNS}
+      FROM incidents i
+      WHERE i.district_id = ${districtId}::int
+        AND (i.id::text LIKE ${prefix + '%'} OR replace(i.id::text, '-', '') LIKE ${prefix + '%'})
+        AND (${window.from}::timestamptz IS NULL OR i.reported_at >= ${window.from}::timestamptz)
+        AND (${window.to}::timestamptz IS NULL OR i.reported_at <= ${window.to}::timestamptz)
+      ORDER BY i.reported_at DESC, i.id
+      LIMIT ${limit}::int OFFSET ${offset}::int`;
+    return rows.map(toRecord);
+  }
+
+  async searchByReporterPhone(
+    districtId: number,
+    phone: string,
+    window: ReportedWindow,
+    limit: number,
+    offset: number,
+  ): Promise<IncidentRecord[]> {
+    // Officers type the local number; the column holds it E.164 with +91. Comparing the
+    // trailing digits accepts both without the caller having to know which form is stored.
+    const digits = phone.replace(/\D/g, '');
+    const rows = await this.prisma.$queryRaw<IncidentRow[]>`
+      SELECT ${INCIDENT_COLUMNS}
+      FROM incidents i
+      JOIN users u ON u.id = i.reporter_id
+      WHERE i.district_id = ${districtId}::int
+        AND right(regexp_replace(u.phone, '[^0-9]', '', 'g'), length(${digits})) = ${digits}
+        AND (${window.from}::timestamptz IS NULL OR i.reported_at >= ${window.from}::timestamptz)
+        AND (${window.to}::timestamptz IS NULL OR i.reported_at <= ${window.to}::timestamptz)
+      ORDER BY i.reported_at DESC, i.id
+      LIMIT ${limit}::int OFFSET ${offset}::int`;
+    return rows.map(toRecord);
+  }
+
+  async searchByText(
+    districtId: number,
+    term: string,
+    window: ReportedWindow,
+    limit: number,
+    offset: number,
+  ): Promise<IncidentRecord[]> {
+    // ILIKE serves the trigram GIN index and finds substrings that similarity() ranks too
+    // low to return; similarity only orders what ILIKE already matched.
+    const pattern = `%${term}%`;
+    const rows = await this.prisma.$queryRaw<IncidentRow[]>`
+      SELECT ${INCIDENT_COLUMNS}
+      FROM incidents i
+      WHERE i.district_id = ${districtId}::int
+        AND (i.address_text ILIKE ${pattern} OR i.description ILIKE ${pattern})
+        AND (${window.from}::timestamptz IS NULL OR i.reported_at >= ${window.from}::timestamptz)
+        AND (${window.to}::timestamptz IS NULL OR i.reported_at <= ${window.to}::timestamptz)
+      ORDER BY GREATEST(
+                 similarity(COALESCE(i.address_text, ''), ${term}),
+                 similarity(COALESCE(i.description, ''), ${term})
+               ) DESC,
+               i.reported_at DESC, i.id
       LIMIT ${limit}::int OFFSET ${offset}::int`;
     return rows.map(toRecord);
   }
