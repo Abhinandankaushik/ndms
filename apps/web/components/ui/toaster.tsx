@@ -7,12 +7,19 @@ import { cn } from '@/lib/utils';
 
 export type ToastVariant = 'default' | 'success' | 'destructive';
 
+export interface ToastAction {
+  label: string;
+  onSelect: () => void;
+}
+
 export interface ToastOptions {
   title: string;
   description?: string;
   variant?: ToastVariant;
   /** Milliseconds before auto-dismiss; 0 keeps the toast until dismissed. */
   durationMs?: number;
+  /** A way to act on what the toast announced before it disappears. */
+  action?: ToastAction;
 }
 
 interface ToastItem {
@@ -21,6 +28,7 @@ interface ToastItem {
   description?: string;
   variant: ToastVariant;
   durationMs: number;
+  action?: ToastAction;
 }
 
 const DEFAULT_DURATION_MS = 5_000;
@@ -37,6 +45,7 @@ export function toast(options: ToastOptions): number {
     description: options.description,
     variant: options.variant ?? 'default',
     durationMs: options.durationMs ?? DEFAULT_DURATION_MS,
+    action: options.action,
   };
   useToastStore.setState((state) => ({ toasts: [...state.toasts, item].slice(-MAX_VISIBLE_TOASTS) }));
   return item.id;
@@ -96,6 +105,18 @@ function ToastCard({ item }: { item: ToastItem }) {
       <div className="grid flex-1 gap-1">
         <p className="text-sm leading-tight font-medium">{item.title}</p>
         {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
+        {item.action && (
+          <button
+            type="button"
+            onClick={() => {
+              item.action?.onSelect();
+              dismissToast(item.id);
+            }}
+            className="mt-1 justify-self-start rounded-xs text-sm font-medium underline underline-offset-4 hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            {item.action.label}
+          </button>
+        )}
       </div>
       <button
         type="button"

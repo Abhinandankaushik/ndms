@@ -7,6 +7,8 @@ import type { IncidentCreatedEvent } from '@/lib/api/types';
 import { DISASTER_TYPE_LABELS } from '@/lib/labels';
 import { useSocketEvent, useSocketStatus } from '@/lib/realtime/socket';
 import { formatPeople, formatPercent } from '../lib/format';
+import { setQueueSort } from '../overview/incident-search';
+import { openIncident } from '../workspace-store';
 import {
   resyncLiveData,
   syncAlertsChanged,
@@ -96,12 +98,15 @@ function useSosAnnouncer(): (event: IncidentCreatedEvent) => void {
       return;
     }
 
+    // Without this the toast was the only trace of a new SOS on screen: a fresh report scores
+    // below the seeded ones, so it is nowhere near the top of the priority queue.
     toast({
       title: 'New SOS',
       description: `${DISASTER_TYPE_LABELS[event.type]} · ${formatPeople(event.peopleAffected)} · ${
         event.lat === null ? 'no location shared' : 'location shared'
       }`,
       variant: 'destructive',
+      action: { label: 'Open this report', onSelect: () => openIncident(event.id) },
     });
     state.open = true;
 
@@ -112,8 +117,9 @@ function useSosAnnouncer(): (event: IncidentCreatedEvent) => void {
       }
       toast({
         title: `${state.suppressed} more SOS ${state.suppressed === 1 ? 'report' : 'reports'}`,
-        description: 'They are in the priority queue on the overview.',
+        description: 'Sort the queue by newest to see them together.',
         variant: 'destructive',
+        action: { label: 'Show newest first', onSelect: () => setQueueSort('newest') },
       });
       state.suppressed = 0;
       state.timer = setTimeout(closeWindow, SOS_TOAST_WINDOW_MS);
